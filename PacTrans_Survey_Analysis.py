@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import re
 
 # Read the Wave1_cleaned_noids data
 survey_W1 = pd.read_csv("C:\\Users\\olive\\Desktop\\UW Files\\_Research Project\\PacTrans Survey Analysis\\PacTrans_Covid_Survey_Waves\\Wave1_cleaned_noids.csv",
@@ -79,23 +80,33 @@ print(pd.Series(survey_W1["Household_Num_W1"]).value_counts())
 
 # Create table for monthly 2020 WA State median income levels
 WA_med_income_2020 = pd.DataFrame({"Household_Size": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-                                   "Monthly_ Median_Income_2020":
+                                   "Monthly_Median_Income_2020":
                                           [4237, 5541, 6845, 8149, 9452, 10756, 11001, 11246, 11491, 11736]})
 
-# Add third column in WA_med_income_2020_mo for annual income
-WA_med_income_2020["Annual_Median_Income_2020"] = WA_med_income_2020["Monthly_ Median_Income_2020"] * 12
-
-print(WA_med_income_2020)
-
-# Create column in survey_W1 for income levels (low, middle, high) based on WA State median income levels. If income is
-# 66.7% or less than median income, it is considered low. If income is 66.7% to 200% of median income,
-# it is considered middle. If income is greater than 200% of median income, it is considered high.
-# survey_W1 = pd.merge(survey_W1, WA_median_income_2020, on="Household_Num_W1", how="left")
-# survey_W1["Income_Level_W1"] = np.select([survey_W1["Income_W1"] <= survey_W1["WA_med_income_2020"] * 0.667,
-#                                          (survey_W1["Income_W1"] > survey_W1["WA_med_income_2020"] * 0.667) & (survey_W1["Income_W1"] <= survey_W1["WA_med_income_2020"] * 2),
-#                                             survey_W1["Income_W1"] > survey_W1["WA_med_income_2020"] * 2],
-#                                             ["Low-Income", "Middle-Income", "High-Income"])
-#
-#
+# Add column in WA_med_income_2020_mo for annual income and annual income thresholds
+WA_med_income_2020["Annual_Median_Income_2020"] = WA_med_income_2020["Monthly_Median_Income_2020"] * 12
+WA_med_income_2020["Low_Income_Thresh_2020"] = WA_med_income_2020["Annual_Median_Income_2020"] * 0.667
+WA_med_income_2020["High_Income_Thresh_2020"] = WA_med_income_2020["Annual_Median_Income_2020"] * 2
 
 
+# convert Annual_Income_W1 from range to a single value in middle of range
+def convert_annual_income(entry):
+    if entry == "Prefer not to answer":
+        return np.nan
+    else:
+        # Extract the numbers from the string
+        numbers = re.findall(r'\d{1,3}(?:,\d{3})*', entry)
+        # Convert the numbers to integers
+        numbers = [int(number.replace(',', '')) for number in numbers]
+        numbers = [int(number) for number in numbers]
+        # Check if there are two numbers in the list (indicating a range)
+        if len(numbers) == 2:
+            # Calculate the average of the range
+            return np.mean(numbers)
+        else:
+            # If there is only one number, return that number
+            return numbers[0]
+
+
+# apply convert_annual_income to Annual_Income_W1
+survey_W1["Annual_Income_Avg_W1"] = survey_W1["Annual_Income_W1"].apply(convert_annual_income)
