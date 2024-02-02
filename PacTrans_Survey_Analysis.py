@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 import re
+import matplotlib.pyplot as plt
+from statsmodels.miscmodels.ordinal_model import OrderedModel
 
 # Read the Wave1_cleaned_noids data
 survey_W1 = pd.read_csv("C:\\Users\\olive\\Desktop\\UW Files\\_Research Project\\PacTrans Survey Analysis\\PacTrans_Covid_Survey_Waves\\Wave1_cleaned_noids.csv",
@@ -26,14 +28,18 @@ survey_W1 = survey_W1.dropna(subset=["Public_Transit_Usage_W1", "Race_W1", "Annu
 # Group transit usage responses
 survey_W1["Public_Transit_Usage_W1_grouped"] = np.select([survey_W1["Public_Transit_Usage_W1"] == "Never",
                                                           survey_W1["Public_Transit_Usage_W1"] == "Once a month or less",
-                                                          survey_W1["Public_Transit_Usage_W1"].isin(["A few times a month", "1-2 days a week", "3-4 days a week"])],
+                                                          survey_W1["Public_Transit_Usage_W1"].isin(
+                                                              ["A few times a month", "1-2 days a week", "3-4 days a week", "Everyday"])],
                                                          ["Never", "Infrequent", "Frequent"])
 
-# Display table for Public_Transit_Usage_W1_grouped
-print(pd.Series(survey_W1["Public_Transit_Usage_W1_grouped"]).value_counts())
+# Convert the column to CategoricalDtype with specified categories and order
+transit_categories = ['Never', 'Infrequent', 'Frequent']
+survey_W1["Public_Transit_Usage_W1_grouped"] = pd.Categorical(survey_W1["Public_Transit_Usage_W1_grouped"],
+                                                              categories=transit_categories, ordered=True)
 
-# Factorize transit usage responses
-survey_W1["Public_Transit_Usage_W1_factor"] = pd.factorize(survey_W1["Public_Transit_Usage_W1_grouped"])[0]
+# TODO delete following 2 lines
+# # Factorize transit usage responses
+# survey_W1["Public_Transit_Usage_W1_factor"] = pd.factorize(survey_W1["Public_Transit_Usage_W1_grouped"])[0]
 
 # Group race responses
 survey_W1["Race_W1_grouped"] = np.select([survey_W1["Race_W1"].isin(["American Indian or Alaska Native"]),
@@ -75,7 +81,7 @@ def calculate_household_size(entry):
 # Apply the function to the specified column
 survey_W1["Household_Num_W1"] = survey_W1["Household_Size_W1"].apply(calculate_household_size)
 
-# Display table for Race_W1_grouped
+# Display table for Household_Num_W1
 print(pd.Series(survey_W1["Household_Num_W1"]).value_counts())
 
 # Create table for monthly 2020 WA State median income levels
@@ -89,6 +95,7 @@ WA_med_income_2020["Low_Income_Thresh_2020"] = WA_med_income_2020["Annual_Median
 WA_med_income_2020["High_Income_Thresh_2020"] = WA_med_income_2020["Annual_Median_Income_2020"] * 2
 
 
+# TODO: figure out why 4 rows are missing after running this function
 # convert Annual_Income_W1 from range to a single value in middle of range
 def convert_annual_income(entry):
     if entry == "Prefer not to answer":
@@ -110,3 +117,67 @@ def convert_annual_income(entry):
 
 # apply convert_annual_income to Annual_Income_W1
 survey_W1["Annual_Income_Avg_W1"] = survey_W1["Annual_Income_W1"].apply(convert_annual_income)
+
+# Display table for Annual_Income_Avg_W1
+print(pd.Series(survey_W1["Annual_Income_Avg_W1"]).value_counts())
+
+# print number of all, not just unique, values in Annual_Income_Avg_W1. This should equal 1310.
+print("count of all Annual Income responses: ", len(survey_W1["Annual_Income_Avg_W1"]))
+
+
+# TODO: figure out why 4 rows are missing after running this function
+# Function to categorize income based on thresholds
+def categorize_income(row):
+    household_size = row['Household_Num_W1']
+
+    # Look up the thresholds based on household size
+    low_thresh = WA_med_income_2020.loc[WA_med_income_2020['Household_Size'] == household_size, 'Low_Income_Thresh_2020'].values[0]
+    high_thresh = WA_med_income_2020.loc[WA_med_income_2020['Household_Size'] == household_size, 'High_Income_Thresh_2020'].values[0]
+
+    if row['Annual_Income_Avg_W1'] < low_thresh:
+        return 'Low'
+    elif row['Annual_Income_Avg_W1'] > high_thresh:
+        return 'High'
+    else:
+        return 'Middle'
+
+
+# Apply the categorize_income function to create the 'Income_Category' column
+survey_W1['Income_Category'] = survey_W1.apply(lambda row: categorize_income(row), axis=1)
+
+# Create binary variable for low-income
+survey_W1['Low_Income'] = np.where(survey_W1['Income_Category'] == 'Low', 1, 0)
+
+# Create binary variable for high-income
+survey_W1['High_Income'] = np.where(survey_W1['Income_Category'] == 'High', 1, 0)
+
+# Create binary variable for white respondents
+survey_W1['White'] = np.where(survey_W1['Race_W1_grouped'] == 'White', 1, 0)
+
+# Create binary variable for non-white respondents
+survey_W1['Non_White'] = np.where(survey_W1['Race_W1_grouped'] != 'White', 1, 0)
+
+# # print bar charts of independent and dependent variables
+# transit_usage_chart = survey_W1["Public_Transit_Usage_W1_factor"].value_counts().plot(kind='bar')
+# plt.show()
+#
+# race_chart = survey_W1["Race_W1_grouped"].value_counts().plot(kind='bar')
+# plt.xticks(rotation=45)
+# plt.show()
+#
+# income_chart = survey_W1["Income_Category"].value_counts().plot(kind='bar')
+# plt.show()
+
+# Display table for ordered logit inputs
+print(pd.Series(survey_W1["Public_Transit_Usage_W1_grouped"]).value_counts())
+print(pd.Series(survey_W1["Low_Income"]).value_counts())
+print(pd.Series(survey_W1["High_Income"]).value_counts())
+print(pd.Series(survey_W1["White"]).value_counts())
+print(pd.Series(survey_W1["Non_White"]).value_counts())
+
+# Create ordered logit model
+mod_log = OrderedModel(survey_W1["Public_Transit_Usage_W1_grouped"],
+                       survey_W1[["Low_Income", "High_Income", "White", "Non_White"]],
+                       distr='logit')
+res_log = mod_log.fit(method='bfgs', disp=False)
+res_log.summary()
