@@ -141,15 +141,14 @@ def categorize_income(row):
     else:
         return 'Middle'
 
-
 # Apply the categorize_income function to create the 'Income_Category' column
-survey_W1['Income_Category'] = survey_W1.apply(lambda row: categorize_income(row), axis=1)
+survey_W1['Income_Category_W1'] = survey_W1.apply(lambda row: categorize_income(row), axis=1)
 
 # Create binary variable for low-income
-survey_W1['Low_Income'] = np.where(survey_W1['Income_Category'] == 'Low', 1, 0)
+survey_W1['Low_Income'] = np.where(survey_W1['Income_Category_W1'] == 'Low', 1, 0)
 
 # Create binary variable for high-income
-survey_W1['High_Income'] = np.where(survey_W1['Income_Category'] == 'High', 1, 0)
+survey_W1['High_Income'] = np.where(survey_W1['Income_Category_W1'] == 'High', 1, 0)
 
 # Create binary variable for white respondents
 survey_W1['White'] = np.where(survey_W1['Race_W1_grouped'] == 'White', 1, 0)
@@ -157,19 +156,49 @@ survey_W1['White'] = np.where(survey_W1['Race_W1_grouped'] == 'White', 1, 0)
 # Create binary variable for non-white respondents
 survey_W1['Non_White'] = np.where(survey_W1['Race_W1_grouped'] != 'White', 1, 0)
 
-# # print bar charts of independent and dependent variables
-# transit_usage_chart = survey_W1["Public_Transit_Usage_W1_factor"].value_counts().plot(kind='bar')
-# plt.show()
-#
-# race_chart = survey_W1["Race_W1_grouped"].value_counts().plot(kind='bar')
-# plt.xticks(rotation=45)
-# plt.show()
-#
-# income_chart = survey_W1["Income_Category"].value_counts().plot(kind='bar')
-# plt.show()
+# print bar charts of independent and dependent variables
+# transit_usage_chart = survey_W1["Public_Transit_Usage_W1_grouped"].value_counts().plot(kind='bar')
+
+transit_usage_counts = survey_W1["Public_Transit_Usage_W1_grouped"].value_counts()
+# Define the desired order of bars
+desired_order = ["Never", "Infrequent", "Frequent"]
+# Use the reindex method to set the order
+transit_usage_counts = transit_usage_counts.reindex(desired_order)
+transit_usage_chart = transit_usage_counts.plot(kind='bar')
+# Add data labels on each bar
+for index, value in enumerate(transit_usage_counts):
+    plt.text(index, value + 0.1, str(value), ha='center', va='bottom')
+plt.tight_layout()
+# rotate x-axis labels to be horizontal
+plt.xticks(rotation=0)
+plt.show()
+
+race_response_counts = survey_W1["Race_W1_grouped"].value_counts()
+race_chart = race_response_counts.plot(kind='bar')
+# Add data labels on each bar
+for index, value in enumerate(race_response_counts):
+    plt.text(index, value + 0.1, str(value), ha='center', va='bottom')
+plt.tight_layout
+plt.xticks(rotation=45, ha='right')
+plt.show()
+
+income_category_counts = survey_W1["Income_Category_W1"].value_counts()
+# Define the desired order of bars
+desired_order = ["Low", "Middle", "High"]
+# Use the reindex method to set the order
+income_category_counts = income_category_counts.reindex(desired_order)
+income_chart = income_category_counts.plot(kind='bar')
+# Add data labels on each bar
+for index, value in enumerate(income_category_counts):
+    plt.text(index, value + 0.1, str(value), ha='center', va='bottom')
+# rotate x-axis labels to be horizontal
+plt.xticks(rotation=0)
+plt.show()
+
+# TODO create stacked bar chart for low, middle, high income with race categories
 
 # Display table for ordered logit inputs
-print(pd.Series(survey_W1["Public_Transit_Usage_W1_grouped"]).value_counts())
+print(survey_W1["Public_Transit_Usage_W1_grouped"].dtype)
 print(pd.Series(survey_W1["Low_Income"]).value_counts())
 print(pd.Series(survey_W1["High_Income"]).value_counts())
 print(pd.Series(survey_W1["White"]).value_counts())
@@ -177,7 +206,29 @@ print(pd.Series(survey_W1["Non_White"]).value_counts())
 
 # Create ordered logit model
 mod_log = OrderedModel(survey_W1["Public_Transit_Usage_W1_grouped"],
-                       survey_W1[["Low_Income", "High_Income", "White", "Non_White"]],
+                       (survey_W1[["Low_Income", "Non_White"]]),
                        distr='logit')
 res_log = mod_log.fit(method='bfgs', disp=False)
-res_log.summary()
+print(res_log.summary())
+print("loglikelihood of model without explanatory variables: ", res_log.llnull)
+print("chi-squared probability of getting a log-likelihood ratio statistic greater than llr: ", res_log.llr_pvalue)
+print(res_log.llr)
+print(res_log.llf)
+
+params = res_log.params
+conf = res_log.conf_int()
+conf['Odds Ratio'] = params
+conf.columns = ['5%', '95%', 'Odds Ratio']
+print(np.exp(conf))
+print(np.exp(res_log.params))
+
+beginningtex = """\\documentclass{report}
+\\usepackage{booktabs}
+\\begin{document}"""
+endtex = "\end{document}"
+
+f = open('myreg.tex', 'w')
+f.write(beginningtex)
+f.write(res_log.summary().as_latex())
+f.write(endtex)
+f.close()
