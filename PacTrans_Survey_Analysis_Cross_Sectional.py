@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import re
+import seaborn as sns
 import matplotlib.pyplot as plt
 from statsmodels.miscmodels.ordinal_model import OrderedModel
 
@@ -47,10 +48,10 @@ pooled_survey_data.to_csv('pooled_survey_data.csv', index=False)
 # Read the pooled data from the new CSV file
 pooled_survey_data = pd.read_csv('pooled_survey_data.csv')
 
-wfh_during_counts = pooled_survey_data['wfh_during'].value_counts()
-wfh_future_counts = pooled_survey_data['wfh_future'].value_counts()
-wfh_during_counts = wfh_during_counts.reindex(['Never', 'Once a month or less', 'A few times a month', '1-2 days a week', '3-4 days a week', 'Everyday'])
-wfh_future_counts = wfh_future_counts.reindex(['Never', 'Once a month or less', 'A few times a month', '1-2 days a week', '3-4 days a week', 'Everyday'])
+# Return a Series containing counts of unique values and sort by index
+wfh_during_counts = pooled_survey_data['wfh_during'].value_counts().reindex(['Never', 'Once a month or less', 'A few times a month', '1-2 days a week', '3-4 days a week', 'Everyday'])
+wfh_future_counts = pooled_survey_data['wfh_future'].value_counts().reindex(['Never', 'Once a month or less', 'A few times a month', '1-2 days a week', '3-4 days a week', 'Everyday'])
+transit_usage_future_counts = pooled_survey_data['transit_usage_future'].value_counts().reindex(['Never', 'Once a month or less', 'A few times a month', '1-2 days a week', '3-4 days a week', 'Everyday'])
 
 # Create side-by-side bar chart for 'wfh_during' and 'wfh_future' using matplotlib
 fig, ax = plt.subplots()
@@ -70,30 +71,45 @@ for index, value in enumerate(wfh_future_counts):
     plt.text(index + bar_width, value + 0.1, str(value), ha='center', va='bottom')
 plt.tight_layout()
 ax.legend()
-plt.show()
+# plt.show()
 
 # create bar chart of transit_usage_future
-transit_usage_future_counts = pooled_survey_data['transit_usage_future'].value_counts()
-transit_usage_future_counts = transit_usage_future_counts.reindex(['Never', 'Once a month or less', 'A few times a month', '1-2 days a week', '3-4 days a week', 'Everyday'])
 transit_usage_future_chart = transit_usage_future_counts.plot(kind='bar')
 # add data labels on each bar
 for index, value in enumerate(transit_usage_future_counts):
     plt.text(index, value + 0.1, str(value), ha='center', va='bottom')
 plt.tight_layout()
 plt.xticks(rotation=0)
-plt.show()
+# plt.show()
 
-# TODO fix this scatterplot
-# create scatterplot with 'transit_usage_future' on x-axis and 'wfh_future' on y-axis
-plt.scatter(pooled_survey_data['transit_usage_future'], pooled_survey_data['wfh_future'])
-plt.xlabel('Transit Usage in the Future')
-plt.ylabel('WFH in the Future')
-plt.show()
+ordinal_mapping = {
+    'Never': 0,
+    'Once a month or less': 1,
+    'A few times a month': 2,
+    '1-2 days a week': 3,
+    '3-4 days a week': 4,
+    'Everyday': 5
+}
 
 # Recode parameters to numeric values
-pooled_survey_data['wfh_during'] = pooled_survey_data['wfh_during'].replace({'Never': 0, 'Once a month or less': 1, 'A few times a month': 2, '1-2 days a week': 3, '3-4 days a week': 4, 'Everyday': 5})
-pooled_survey_data['wfh_future'] = pooled_survey_data['wfh_future'].replace({'Never': 0, 'Once a month or less': 1, 'A few times a month': 2, '1-2 days a week': 3, '3-4 days a week': 4, 'Everyday': 5})
-pooled_survey_data['transit_usage_future'] = pooled_survey_data['transit_usage_future'].replace({'Never': 0, 'Once a month or less': 1, 'A few times a month': 2, '1-2 days a week': 3, '3-4 days a week': 4, 'Everyday': 5})
+pooled_survey_data['wfh_during'] = pooled_survey_data['wfh_during'].map(ordinal_mapping)
+pooled_survey_data['wfh_future'] = pooled_survey_data['wfh_future'].map(ordinal_mapping)
+pooled_survey_data['transit_usage_future'] = pooled_survey_data['transit_usage_future'].map(ordinal_mapping)
+
+# Create cross-tabulation (crosstab)
+cross_tab = pd.crosstab(pooled_survey_data['wfh_future'], pooled_survey_data['transit_usage_future'])
+# Convert index and columns to integers
+cross_tab.index = cross_tab.index.astype(int)
+cross_tab.columns = cross_tab.columns.astype(int)
+# Reverse the order of the rows
+cross_tab = cross_tab.iloc[::-1, :]
+# Create heatmap
+plt.figure(figsize=(10, 6))
+sns.heatmap(cross_tab, cmap='viridis', annot=True, fmt="d", linewidths=.5)
+plt.title('Heatmap of WFH Future vs Transit Usage Future')
+plt.xlabel('Transit Usage Future')
+plt.ylabel('WFH Future')
+plt.show()
 
 # Create column based on diff between 'wfh_during' and 'wfh_future'
 pooled_survey_data['wfh_change_estimated'] = np.where(pooled_survey_data['wfh_during'] == pooled_survey_data['wfh_future'], 'No Change', np.where(pooled_survey_data['wfh_during'] > pooled_survey_data['wfh_future'], 'Decreased WFH', 'Increased WFH'))
@@ -112,5 +128,5 @@ for index, value in enumerate(wfh_change_counts):
 plt.tight_layout()
 # rotate x-axis labels to be horizontal
 plt.xticks(rotation=0)
-plt.show()
+# plt.show()
 
