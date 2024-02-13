@@ -253,10 +253,8 @@ pooled_survey_data["wfh_change_estimated"] = pd.Categorical(pooled_survey_data["
                                                               categories=wfh_categories, ordered=True)
 
 # create ordered logit model for 'wfh_change_estimated'
-# mod_log = OrderedModel(pooled_survey_data['wfh_change_estimated'],
-#                        (pooled_survey_data[['transit_usage_future', 'Low_Income', 'Middle_Income']]), distr='logit')
 mod_log = OrderedModel(pooled_survey_data['wfh_change_estimated'],
-                       (pooled_survey_data[['transit_usage_future']]), distr='logit')
+                       (pooled_survey_data[['transit_usage_future', 'Low_Income', 'Middle_Income']]), distr='logit')
 res_log = mod_log.fit(method='bfgs', disp=False)
 print(res_log.summary())
 print("Log-likelihood of model: ", res_log.llf)
@@ -264,6 +262,15 @@ print("loglikelihood of model without explanatory variables: ", res_log.llnull)
 print("Likelihood ratio chi-squared statistic: ", res_log.llr)
 print("chi-squared probability of getting a log-likelihood ratio statistic greater than llr: ", res_log.llr_pvalue)
 
-
-
 # TODO print model results to latex
+
+beginningtex = """\\documentclass{report}
+\\usepackage{booktabs}
+\\begin{document}"""
+endtex = "\end{document}"
+
+f = open('res_log_cross_sec.tex', 'w')
+f.write(beginningtex)
+f.write(res_log.summary().as_latex())
+f.write(endtex)
+f.close()
