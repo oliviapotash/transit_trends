@@ -238,6 +238,39 @@ pooled_survey_data['transit_usage_future'] = pooled_survey_data['transit_usage_f
 # plt.ylabel('WFH Future')
 # plt.show()
 
+# # Mapping of numeric values to labels
+# freq_labels = ['Never', 'Once a month or less', 'A few times a month', '1-2 days a week', '3-4 days a week', 'Everyday']
+#
+# # Create a figure and axis object for the subplots
+# fig, axes = plt.subplots(3, 2, figsize=(12, 10), sharey=True)
+#
+# # Iterate over each possible value of 'wfh_future'
+# for value, ax in zip(range(6), axes.flatten()):
+#     # Filter the data to include only the current value
+#     subset = pooled_survey_data[pooled_survey_data['wfh_future'] == value]
+#     # Count the number of times each value of 'transit_usage_future' occurs
+#     transit_usage_future_subset = subset['transit_usage_future'].value_counts()
+#     # Create a bar chart of the transit_usage_future
+#     transit_usage_future_chart = transit_usage_future_subset.plot(kind='bar', ax=ax)
+#     # Add data labels on each bar
+#     for index, val in enumerate(transit_usage_future_subset):
+#         ax.text(index, val + 0.1, str(val), ha='center', va='bottom')
+#     # Set the x-axis tick locations and labels
+#     # decrease x-axis label size and wrap x-axis labels
+#     ax.tick_params(axis='x', labelsize=9)
+#     ax.set_xticks(range(len(freq_labels)))
+#     ax.set_xticklabels(freq_labels, rotation=0, ha='center')
+#
+#     # set y-axis label
+#     ax.set_xlabel('Post-Pandemic Transit Usage Frequency')
+#
+#     # Set subplot title with corresponding label
+#     ax.set_title('Post-Pandemic WFH Frequency: ' + freq_labels[value])
+#
+# # Adjust layout to prevent overlap
+# plt.tight_layout()
+# plt.show()
+
 # Mapping of numeric values to labels
 freq_labels = ['Never', 'Once a month or less', 'A few times a month', '1-2 days a week', '3-4 days a week', 'Everyday']
 
@@ -249,25 +282,23 @@ for value, ax in zip(range(6), axes.flatten()):
     # Filter the data to include only the current value
     subset = pooled_survey_data[pooled_survey_data['wfh_future'] == value]
     # Count the number of times each value of 'transit_usage_future' occurs
-    transit_usage_future_subset = subset['transit_usage_future'].value_counts()
+    transit_usage_future_subset = subset['transit_usage_future'].value_counts(normalize=True)  # Normalize frequencies
     # Create a bar chart of the transit_usage_future
     transit_usage_future_chart = transit_usage_future_subset.plot(kind='bar', ax=ax)
-    # Add data labels on each bar
+    # Add data labels on each bar (with normalized counts)
     for index, val in enumerate(transit_usage_future_subset):
-        ax.text(index, val + 0.1, str(val), ha='center', va='bottom')
+        ax.text(index, val + 0.01, f'{val:.2f}', ha='center', va='bottom')
     # Set the x-axis tick locations and labels
-    # decrease x-axis label size and wrap x-axis labels
     ax.tick_params(axis='x', labelsize=9)
     ax.set_xticks(range(len(freq_labels)))
     ax.set_xticklabels(freq_labels, rotation=0, ha='center')
 
     # set y-axis label
-    ax.set_xlabel('Post-Pandemic Transit Usage Frequency')
+    ax.set_ylabel('Probability')
 
     # Set subplot title with corresponding label
     ax.set_title('Post-Pandemic WFH Frequency: ' + freq_labels[value])
 
-# Adjust layout to prevent overlap
 plt.tight_layout()
 plt.show()
 
@@ -335,21 +366,39 @@ pooled_survey_data["wfh_change_estimated"] = pd.Categorical(pooled_survey_data["
 # print("chi-squared probability of getting a log-likelihood ratio statistic greater than llr: ", res_log.llr_pvalue)
 # # compute the f-test for the model
 # print("F-test for the model: ", res_log.f_test(np.eye(5)))
-#
-# params = res_log.params
-# conf = res_log.conf_int()
-# conf['Odds Ratio'] = params
-# conf.columns = ['5%', '95%', 'Odds Ratio']
-# print(np.exp(conf))
-# print(np.exp(res_log.params))
-#
-# beginningtex = """\\documentclass{report}
-# \\usepackage{booktabs}
-# \\begin{document}"""
-# endtex = "\end{document}"
-#
-# f = open('res_log_cross_sec.tex', 'w')
-# f.write(beginningtex)
-# f.write(res_log.summary().as_latex())
-# f.write(endtex)
-# f.close()
+
+# create ordered logit model where independent variable is 'wfh_future' and dependent variables are
+# 'transit_usage_future', 'Middle_Income', 'High_Income'
+
+# print data type of 'wfh_future' and 'transit_usage_future'
+print(pooled_survey_data['wfh_future'].dtype)
+print(pooled_survey_data['transit_usage_future'].dtype)
+
+mod_log = OrderedModel(pooled_survey_data['wfh_future'],
+                       (pooled_survey_data[['transit_usage_future', 'Middle_Income', 'High_Income']]), distr='logit')
+res_log = mod_log.fit(method='bfgs', disp=False)
+print(res_log.summary())
+print("Log-likelihood of model: ", res_log.llf)
+print("loglikelihood of model without explanatory variables: ", res_log.llnull)
+print("Likelihood ratio chi-squared statistic: ", res_log.llr)
+print("chi-squared probability of getting a log-likelihood ratio statistic greater than llr: ", res_log.llr_pvalue)
+# compute the f-test for the model
+print("F-test for the model: ", res_log.f_test(np.eye(8)))
+
+params = res_log.params
+conf = res_log.conf_int()
+conf['Odds Ratio'] = params
+conf.columns = ['5%', '95%', 'Odds Ratio']
+print(np.exp(conf))
+print(np.exp(res_log.params))
+
+beginningtex = """\\documentclass{report}
+\\usepackage{booktabs}
+\\begin{document}"""
+endtex = "\end{document}"
+
+f = open('res_log_cross_sec.tex', 'w')
+f.write(beginningtex)
+f.write(res_log.summary().as_latex())
+f.write(endtex)
+f.close()
