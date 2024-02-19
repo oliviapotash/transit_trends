@@ -276,6 +276,8 @@ freq_labels = ['Never', 'Once a month or less', 'A few times a month', '1-2 days
 
 # Create a figure and axis object for the subplots
 fig, axes = plt.subplots(3, 2, figsize=(12, 10), sharey=True)
+# set y-axis limit as 0.5
+axes[0, 0].set_ylim(0, 0.5)
 
 # Iterate over each possible value of 'wfh_future'
 for value, ax in zip(range(6), axes.flatten()):
@@ -295,6 +297,9 @@ for value, ax in zip(range(6), axes.flatten()):
 
     # set y-axis label
     ax.set_ylabel('Probability')
+
+    # set x-axis label
+    ax.set_xlabel('Post-Pandemic Transit Usage Frequency')
 
     # Set subplot title with corresponding label
     ax.set_title('Post-Pandemic WFH Frequency: ' + freq_labels[value])
