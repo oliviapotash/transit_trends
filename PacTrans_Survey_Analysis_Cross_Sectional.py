@@ -309,6 +309,69 @@ print(pooled_survey_data['transit_change_estimated'].value_counts())
 # plt.tight_layout()
 # plt.show()
 
+# Mapping of numeric values to labels
+freq_labels = ['Never', 'Once a month or less', 'A few times a month', '1-2 days a week', '3-4 days a week', 'Everyday']
+# Set the seaborn style
+sns.set_style("whitegrid")
+# Filter the data to exclude rows with NaN in 'transit_usage_future'
+filtered_data = pooled_survey_data.dropna(subset=['transit_usage_future'])
+# Get the total count of responses for each WFH frequency
+total_count_per_wfh_freq = filtered_data['wfh_future'].value_counts()
+# Plot the grouped bar chart
+plt.figure(figsize=(14, 8))
+# Iterate over each WFH frequency
+for wfh_freq in range(6):
+    # Filter the data for the current WFH frequency
+    wfh_freq_data = filtered_data[filtered_data['wfh_future'] == wfh_freq]
+    # Calculate the conditional distribution of transit usage frequencies
+    transit_usage_freq_dist = wfh_freq_data['transit_usage_future'].value_counts(normalize=True)
+    # Plot the bar chart for the current WFH frequency
+    plt.bar(transit_usage_freq_dist.index + wfh_freq * 0.1, transit_usage_freq_dist.values * 100, width=0.1, label=f'{freq_labels[wfh_freq]}')
+# Set labels and title
+plt.xlabel('Post-Pandemic Transit Usage Frequency')
+plt.ylabel('Percentage')
+plt.title('Post-Pandemic WFH Frequency vs. Transit Usage Frequency')
+# Set x-axis tick labels
+plt.xticks(ticks=range(len(freq_labels)), labels=freq_labels, rotation=45, ha='right')
+# Show legend
+plt.legend(title='WFH Frequency')
+# Show the plot
+plt.tight_layout()
+plt.show()
+
+# # Mapping of numeric values to labels
+# freq_labels = ['Never', 'Once a month or less', 'A few times a month', '1-2 days a week', '3-4 days a week', 'Everyday']
+#
+# # Create a figure and axis object for the subplots
+# fig, axes = plt.subplots(3, 2, figsize=(12, 10), sharey=True)
+# # set y-axis limit as 0.5
+# axes[0, 0].set_ylim(0, 0.5)
+#
+# # Iterate over each possible value of 'wfh_future'
+# for value, ax in zip(range(6), axes.flatten()):
+#     # Filter the data to include only the current value
+#     subset = pooled_survey_data[pooled_survey_data['transit_usage_future'] == value]
+#     # Count the number of times each value of 'wfh_usage_future' occurs
+#     wfh_usage_future_subset = subset['wfh_future'].value_counts(normalize=True)  # Normalize frequencies
+#     # Create a bar chart of the transit_usage_future
+#     wfh_usage_future_chart = wfh_usage_future_subset.plot(kind='bar', ax=ax)
+#     # Add data labels on each bar (with normalized counts)
+#     for index, val in enumerate(wfh_usage_future_subset):
+#         ax.text(index, val + 0.01, f'{val:.2f}', ha='center', va='bottom')
+#     # Set the x-axis tick locations and labels
+#     ax.tick_params(axis='x', labelsize=9)
+#     ax.set_xticks(range(len(freq_labels)))
+#     ax.set_xticklabels(freq_labels, rotation=0, ha='center')
+#     # set y-axis label
+#     ax.set_ylabel('Percentage')
+#     # set x-axis label
+#     ax.set_xlabel('Post-Pandemic WFH Usage Frequency')
+#     # Set subplot title with corresponding label
+#     ax.set_title('Post-Pandemic Transit Frequency: ' + freq_labels[value])
+#
+# plt.tight_layout()
+# plt.show()
+
 # income_category_counts = pooled_survey_data['income_category'].value_counts()
 # # Define the desired order of bars
 # desired_order = ["Low", "Middle", "High"]
