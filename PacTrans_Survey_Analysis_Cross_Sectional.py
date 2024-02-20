@@ -339,6 +339,40 @@ plt.legend(title='WFH Frequency')
 plt.tight_layout()
 plt.show()
 
+
+
+# Mapping of numeric values to labels
+freq_labels = ['Never', 'Once a month or less', 'A few times a month', '1-2 days a week', '3-4 days a week', 'Everyday']
+# Set the seaborn style
+sns.set_style("whitegrid")
+# Filter the data to exclude rows with NaN in 'transit_usage_future'
+filtered_data = pooled_survey_data.dropna(subset=['wfh_future'])
+# Get the total count of responses for each WFH frequency
+total_count_per_wfh_freq = filtered_data['transit_usage_future'].value_counts()
+# Plot the grouped bar chart
+plt.figure(figsize=(14, 8))
+# Iterate over each WFH frequency
+for transit_freq in range(6):
+    # Filter the data for the current WFH frequency
+    transit_freq_data = filtered_data[filtered_data['transit_usage_future'] == transit_freq]
+    # Calculate the conditional distribution of transit usage frequencies
+    wfh_freq_dist = transit_freq_data['wfh_future'].value_counts(normalize=True)
+    # Plot the bar chart for the current WFH frequency
+    plt.bar(wfh_freq_dist.index + transit_freq * 0.1, wfh_freq_dist.values * 100, width=0.1, label=f'{freq_labels[transit_freq]}')
+# Set labels and title
+plt.xlabel('Post-Pandemic WFH Frequency')
+plt.ylabel('Percentage')
+plt.title('Post-Pandemic WFH Frequency vs. Transit Usage Frequency')
+# Set x-axis tick labels
+plt.xticks(ticks=range(len(freq_labels)), labels=freq_labels, rotation=45, ha='right')
+# Show legend
+plt.legend(title='Post-Pandemic Transit Usage Frequency')
+# Show the plot
+plt.tight_layout()
+plt.show()
+
+
+
 # # Mapping of numeric values to labels
 # freq_labels = ['Never', 'Once a month or less', 'A few times a month', '1-2 days a week', '3-4 days a week', 'Everyday']
 #
@@ -415,7 +449,7 @@ plt.show()
 
 ###################################################################################################################
 
-# create ordered logit model where independent variable is 'wfh_future' and dependent variables are
+# create ordered logit model where dependent variable is 'wfh_future' and independent variables are
 # 'transit_usage_future', 'Middle_Income', 'High_Income'
 
 mod_log = OrderedModel(pooled_survey_data['wfh_future'],
@@ -442,6 +476,38 @@ beginningtex = """\\documentclass{report}
 endtex = "\end{document}"
 
 f = open('res_log_cross_sec.tex', 'w')
+f.write(beginningtex)
+f.write(res_log.summary().as_latex())
+f.write(endtex)
+f.close()
+
+# create ordered logit model where dependent variable is 'wfh_future' and independent variables are
+# 'transit_usage_future', 'Middle_Income', 'High_Income'
+
+mod_log = OrderedModel(pooled_survey_data['transit_usage_future'],
+                       (pooled_survey_data[['wfh_future', 'Middle_Income', 'High_Income']]), distr='logit')
+res_log = mod_log.fit(method='bfgs', disp=False)
+print(res_log.summary())
+print("Log-likelihood of model: ", res_log.llf)
+print("loglikelihood of model without explanatory variables: ", res_log.llnull)
+print("Likelihood ratio chi-squared statistic: ", res_log.llr)
+print("chi-squared probability of getting a log-likelihood ratio statistic greater than llr: ", res_log.llr_pvalue)
+# compute the f-test for the model
+print("F-test for the model: ", res_log.f_test(np.eye(8)))
+
+params = res_log.params
+conf = res_log.conf_int()
+conf['Odds Ratio'] = params
+conf.columns = ['5%', '95%', 'Odds Ratio']
+print(np.exp(conf))
+print(np.exp(res_log.params))
+
+beginningtex = """\\documentclass{report}
+\\usepackage{booktabs}
+\\begin{document}"""
+endtex = "\end{document}"
+
+f = open('res_log_transit_dependent_var.tex', 'w')
 f.write(beginningtex)
 f.write(res_log.summary().as_latex())
 f.write(endtex)
