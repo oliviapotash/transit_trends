@@ -188,22 +188,93 @@ ordinal_mapping = {
     'Everyday': 5
 }
 
-# Recode parameters to numeric values
-pooled_survey_data['wfh_during'] = pooled_survey_data['wfh_during'].map(ordinal_mapping)
-pooled_survey_data['wfh_future'] = pooled_survey_data['wfh_future'].map(ordinal_mapping)
-pooled_survey_data['transit_usage_during'] = pooled_survey_data['transit_usage_during'].map(ordinal_mapping)
-pooled_survey_data['transit_usage_future'] = pooled_survey_data['transit_usage_future'].map(ordinal_mapping)
+interval_mapping = {
+    'Never': 0,  # days/week
+    'Once a month or less': 0.25,
+    'A few times a month': 1,
+    '1-2 days a week': 1.5,
+    '3-4 days a week': 3.5,
+    'Everyday': 7
+}
 
-# Create column based on diff between 'wfh_during' and 'wfh_future'
-pooled_survey_data['wfh_change_estimated'] = np.where(pooled_survey_data['wfh_during'] == pooled_survey_data['wfh_future'], 'No Change', np.where(pooled_survey_data['wfh_during'] > pooled_survey_data['wfh_future'], 'Decreased WFH', 'Increased WFH'))
+
+# Recode parameters to numeric values
+pooled_survey_data['wfh_during_ord'] = pooled_survey_data['wfh_during'].map(ordinal_mapping)
+pooled_survey_data['wfh_future_ord'] = pooled_survey_data['wfh_future'].map(ordinal_mapping)
+pooled_survey_data['transit_usage_during_ord'] = pooled_survey_data['transit_usage_during'].map(ordinal_mapping)
+pooled_survey_data['transit_usage_future_ord'] = pooled_survey_data['transit_usage_future'].map(ordinal_mapping)
+pooled_survey_data['wfh_future_interval'] = pooled_survey_data['wfh_future'].map(interval_mapping)
+
+# Create column based on diff between 'wfh_during_ord' and 'wfh_future_ord'
+pooled_survey_data['wfh_change_estimated'] = np.where(pooled_survey_data['wfh_during_ord'] == pooled_survey_data['wfh_future_ord'], 'No Change', np.where(pooled_survey_data['wfh_during_ord'] > pooled_survey_data['wfh_future_ord'], 'Decreased WFH', 'Increased WFH'))
 # print the counts of unique values in 'wfh_change_estimated'
-print(pooled_survey_data['wfh_change_estimated'].value_counts())
+# print(pooled_survey_data['wfh_change_estimated'].value_counts())
 
 # Create column based on diff between transit_usage_during and transit_usage_future
-pooled_survey_data['transit_change_estimated'] = np.where(pooled_survey_data['transit_usage_during'] == pooled_survey_data['transit_usage_future'], 'No Change', np.where(pooled_survey_data['transit_usage_during'] > pooled_survey_data['transit_usage_future'], 'Decreased Transit', 'Increased Transit'))
+pooled_survey_data['transit_change_estimated'] = np.where(pooled_survey_data['transit_usage_during_ord'] == pooled_survey_data['transit_usage_future_ord'], 'No Change', np.where(pooled_survey_data['transit_usage_during_ord'] > pooled_survey_data['transit_usage_future_ord'], 'Decreased Transit', 'Increased Transit'))
 # print the counts of unique values in 'transit_change_estimated'
-print(pooled_survey_data['transit_change_estimated'].value_counts())
+# print(pooled_survey_data['transit_change_estimated'].value_counts())
 
+
+###################################################################################################################
+
+#       Create ordered logit model
+
+###################################################################################################################
+
+# create ordered logit model where dependent variable is 'transit_usage_future' and independent variables are
+# 'wfh_future' (interval), 'Middle_Income', 'High_Income'
+
+# set transit_usage_future to ordered
+pooled_survey_data['transit_usage_future_ordered'] = pd.Categorical(pooled_survey_data['transit_usage_future'], categories=['Never', 'Once a month or less', 'A few times a month', '1-2 days a week', '3-4 days a week', 'Everyday'], ordered=True)
+
+# write pooled_survey_data to a new CSV file called 'pooled_survey_data_for_R.csv' with ONLY columns wf_future_interval, transit_usage_future_ordered, Middle_Income, High_Income
+
+pooled_survey_data.to_csv('pooled_survey_data_for_R.csv', index=False)
+
+# print first five rows of wfh_future_interval, transit_usage_future
+print(pooled_survey_data[['wfh_future_interval', 'transit_usage_future_ordered', 'Middle_Income', 'High_Income']].head())
+print(pooled_survey_data['wfh_future_interval'].value_counts())
+print(pooled_survey_data['transit_usage_future_ordered'].value_counts())
+print(pooled_survey_data['Middle_Income'].value_counts())
+print(pooled_survey_data['High_Income'].value_counts())
+
+# check that 'transit_usage_future_ordered' is ordered
+print("dtype of 'transit_usage_future_ordered': ", pooled_survey_data['transit_usage_future_ordered'].dtype)
+print("transit_usage_future_ordered is ordered?", pooled_survey_data['transit_usage_future_ordered'].dtype.ordered)
+
+mod_log = OrderedModel(pooled_survey_data['transit_usage_future_ordered'],
+                       (pooled_survey_data[['wfh_future_interval', 'Middle_Income', 'High_Income']]), distr='logit')
+res_log = mod_log.fit(method='bfgs', disp=False)
+print(res_log.summary())
+
+print("Log-likelihood of model: ", res_log.llf)
+print("loglikelihood of model without explanatory variables: ", res_log.llnull)
+print("Likelihood ratio chi-squared statistic: ", res_log.llr)
+print("chi-squared probability of getting a log-likelihood ratio statistic greater than llr: ", res_log.llr_pvalue)
+# compute the f-test for the model
+print("F-test for the model: ", res_log.f_test(np.eye(8)))
+
+num_of_thresholds = 5
+print('thresholds: ', mod_log.transform_threshold_params(res_log.params[-num_of_thresholds:]))
+
+params = res_log.params
+conf = res_log.conf_int()
+conf['Odds Ratio'] = params
+conf.columns = ['5%', '95%', 'Odds Ratio']
+print(np.exp(conf))
+print(np.exp(res_log.params))
+
+beginningtex = """\\documentclass{report}
+\\usepackage{booktabs}
+\\begin{document}"""
+endtex = "\end{document}"
+
+f = open('res_log_wfh_interval.tex', 'w')
+f.write(beginningtex)
+f.write(res_log.summary().as_latex())
+f.write(endtex)
+f.close()
 
 ###################################################################################################################
 
@@ -212,7 +283,7 @@ print(pooled_survey_data['transit_change_estimated'].value_counts())
 ###################################################################################################################
 
 
-# # Create side-by-side bar chart for 'wfh_during' and 'wfh_future'
+# # Create side-by-side bar chart for 'wfh_during_counts' and 'wfh_future_counts'
 # fig, ax = plt.subplots()
 # bar_width = 0.35
 # index = np.arange(6)
@@ -231,6 +302,34 @@ print(pooled_survey_data['transit_change_estimated'].value_counts())
 # plt.tight_layout()
 # ax.legend()
 # plt.show()
+
+# # Create bar chart of transit_usage_future_counts
+# transit_usage_future_chart = transit_usage_future_counts.plot(kind='bar')
+# # set x label
+# plt.xlabel('Post-Pandemic Transit Usage')
+# # set y label
+# plt.ylabel('Count')
+# # add data labels on each bar
+# for index, value in enumerate(transit_usage_future_counts):
+#     plt.text(index, value + 0.1, str(value), ha='center', va='bottom')
+# plt.tight_layout()
+# plt.xticks(rotation=0)
+# plt.show()
+
+# create bar chart of wfh_future_interval
+# ordered_num_days = [0, 0.25, 1, 1.5, 3.5, 7]
+# wfh_chart_ordered_chart = pooled_survey_data['wfh_future_interval'].value_counts().reindex(ordered_num_days).plot(kind='bar')
+# # set x label
+# plt.xlabel('Post-Pandemic WFH Frequency Days/Week')
+# # set y label
+# plt.ylabel('Count')
+# # add data labels on each bar
+# for index, value in enumerate(pooled_survey_data['wfh_future_interval'].value_counts().reindex(ordered_num_days)):
+#     plt.text(index, value + 0.1, str(value), ha='center', va='bottom')
+# plt.tight_layout()
+# plt.xticks(rotation=0)
+# plt.show()
+
 
 # # Create side-by-side bar chart for 'transit_usage_during_counts' and 'transit_usage_future_counts'
 # fig, ax = plt.subplots()
@@ -284,12 +383,12 @@ print(pooled_survey_data['transit_change_estimated'].value_counts())
 # # set y-axis limit as 0.5
 # axes[0, 0].set_ylim(0, 0.5)
 #
-# # Iterate over each possible value of 'wfh_future'
+# # Iterate over each possible value of 'wfh_future_ord'
 # for value, ax in zip(range(6), axes.flatten()):
 #     # Filter the data to include only the current value
-#     subset = pooled_survey_data[pooled_survey_data['wfh_future'] == value]
-#     # Count the number of times each value of 'transit_usage_future' occurs
-#     transit_usage_future_subset = subset['transit_usage_future'].value_counts(normalize=True)  # Normalize frequencies
+#     subset = pooled_survey_data[pooled_survey_data['wfh_future_ord'] == value]
+#     # Count the number of times each value of 'transit_usage_future_ord' occurs
+#     transit_usage_future_subset = subset['transit_usage_future_ord'].value_counts(normalize=True)  # Normalize frequencies
 #     # Create a bar chart of the transit_usage_future
 #     transit_usage_future_chart = transit_usage_future_subset.plot(kind='bar', ax=ax)
 #     # Add data labels on each bar (with normalized counts)
@@ -309,69 +408,65 @@ print(pooled_survey_data['transit_change_estimated'].value_counts())
 # plt.tight_layout()
 # plt.show()
 
-# Mapping of numeric values to labels
-freq_labels = ['Never', 'Once a month or less', 'A few times a month', '1-2 days a week', '3-4 days a week', 'Everyday']
-# Set the seaborn style
-sns.set_style("whitegrid")
-# Filter the data to exclude rows with NaN in 'transit_usage_future'
-filtered_data = pooled_survey_data.dropna(subset=['transit_usage_future'])
-# Get the total count of responses for each WFH frequency
-total_count_per_wfh_freq = filtered_data['wfh_future'].value_counts()
-# Plot the grouped bar chart
-plt.figure(figsize=(14, 8))
-# Iterate over each WFH frequency
-for wfh_freq in range(6):
-    # Filter the data for the current WFH frequency
-    wfh_freq_data = filtered_data[filtered_data['wfh_future'] == wfh_freq]
-    # Calculate the conditional distribution of transit usage frequencies
-    transit_usage_freq_dist = wfh_freq_data['transit_usage_future'].value_counts(normalize=True)
-    # Plot the bar chart for the current WFH frequency
-    plt.bar(transit_usage_freq_dist.index + wfh_freq * 0.1, transit_usage_freq_dist.values * 100, width=0.1, label=f'{freq_labels[wfh_freq]}')
-# Set labels and title
-plt.xlabel('Post-Pandemic Transit Usage Frequency')
-plt.ylabel('Percentage')
-plt.title('Post-Pandemic WFH Frequency vs. Transit Usage Frequency')
-# Set x-axis tick labels
-plt.xticks(ticks=range(len(freq_labels)), labels=freq_labels, rotation=45, ha='right')
-# Show legend
-plt.legend(title='WFH Frequency')
-# Show the plot
-plt.tight_layout()
-plt.show()
+# # Mapping of numeric values to labels
+# freq_labels = ['Never', 'Once a month or less', 'A few times a month', '1-2 days a week', '3-4 days a week', 'Everyday']
+# # Set the seaborn style
+# sns.set_style("whitegrid")
+# # Filter the data to exclude rows with NaN in 'transit_usage_future'
+# filtered_data = pooled_survey_data.dropna(subset=['transit_usage_future_ord'])
+# # Get the total count of responses for each WFH frequency
+# total_count_per_wfh_freq = filtered_data['wfh_future_ord'].value_counts()
+# # Plot the grouped bar chart
+# plt.figure(figsize=(14, 8))
+# # Iterate over each WFH frequency
+# for wfh_freq in range(6):
+#     # Filter the data for the current WFH frequency
+#     wfh_freq_data = filtered_data[filtered_data['wfh_future_ord'] == wfh_freq]
+#     # Calculate the conditional distribution of transit usage frequencies
+#     transit_usage_freq_dist = wfh_freq_data['transit_usage_future_ord'].value_counts(normalize=True)
+#     # Plot the bar chart for the current WFH frequency
+#     plt.bar(transit_usage_freq_dist.index + wfh_freq * 0.1, transit_usage_freq_dist.values * 100, width=0.1, label=f'{freq_labels[wfh_freq]}')
+# # Set labels and title
+# plt.xlabel('Post-Pandemic Transit Usage Frequency')
+# plt.ylabel('Percentage')
+# plt.title('Post-Pandemic WFH Frequency vs. Transit Usage Frequency')
+# # Set x-axis tick labels
+# plt.xticks(ticks=range(len(freq_labels)), labels=freq_labels, rotation=45, ha='right')
+# # Show legend
+# plt.legend(title='WFH Frequency')
+# # Show the plot
+# plt.tight_layout()
+# plt.show()
 
-
-
-# Mapping of numeric values to labels
-freq_labels = ['Never', 'Once a month or less', 'A few times a month', '1-2 days a week', '3-4 days a week', 'Everyday']
-# Set the seaborn style
-sns.set_style("whitegrid")
-# Filter the data to exclude rows with NaN in 'transit_usage_future'
-filtered_data = pooled_survey_data.dropna(subset=['wfh_future'])
-# Get the total count of responses for each WFH frequency
-total_count_per_wfh_freq = filtered_data['transit_usage_future'].value_counts()
-# Plot the grouped bar chart
-plt.figure(figsize=(14, 8))
-# Iterate over each WFH frequency
-for transit_freq in range(6):
-    # Filter the data for the current WFH frequency
-    transit_freq_data = filtered_data[filtered_data['transit_usage_future'] == transit_freq]
-    # Calculate the conditional distribution of transit usage frequencies
-    wfh_freq_dist = transit_freq_data['wfh_future'].value_counts(normalize=True)
-    # Plot the bar chart for the current WFH frequency
-    plt.bar(wfh_freq_dist.index + transit_freq * 0.1, wfh_freq_dist.values * 100, width=0.1, label=f'{freq_labels[transit_freq]}')
-# Set labels and title
-plt.xlabel('Post-Pandemic WFH Frequency')
-plt.ylabel('Percentage')
-plt.title('Post-Pandemic WFH Frequency vs. Transit Usage Frequency')
-# Set x-axis tick labels
-plt.xticks(ticks=range(len(freq_labels)), labels=freq_labels, rotation=45, ha='right')
-# Show legend
-plt.legend(title='Post-Pandemic Transit Usage Frequency')
-# Show the plot
-plt.tight_layout()
-plt.show()
-
-
+# # Mapping of numeric values to labels
+# freq_labels = ['Never', 'Once a month or less', 'A few times a month', '1-2 days a week', '3-4 days a week', 'Everyday']
+# # Set the seaborn style
+# sns.set_style("whitegrid")
+# # Filter the data to exclude rows with NaN in 'transit_usage_future'
+# filtered_data = pooled_survey_data.dropna(subset=['wfh_future_ord'])
+# # Get the total count of responses for each WFH frequency
+# total_count_per_wfh_freq = filtered_data['transit_usage_future_ord'].value_counts()
+# # Plot the grouped bar chart
+# plt.figure(figsize=(14, 8))
+# # Iterate over each WFH frequency
+# for transit_freq in range(6):
+#     # Filter the data for the current WFH frequency
+#     transit_freq_data = filtered_data[filtered_data['transit_usage_future_ord'] == transit_freq]
+#     # Calculate the conditional distribution of transit usage frequencies
+#     wfh_freq_dist = transit_freq_data['wfh_future_ord'].value_counts(normalize=True)
+#     # Plot the bar chart for the current WFH frequency
+#     plt.bar(wfh_freq_dist.index + transit_freq * 0.1, wfh_freq_dist.values * 100, width=0.1, label=f'{freq_labels[transit_freq]}')
+# # Set labels and title
+# plt.xlabel('Post-Pandemic WFH Frequency')
+# plt.ylabel('Percentage')
+# plt.title('Post-Pandemic WFH Frequency vs. Transit Usage Frequency')
+# # Set x-axis tick labels
+# plt.xticks(ticks=range(len(freq_labels)), labels=freq_labels, rotation=45, ha='right')
+# # Show legend
+# plt.legend(title='Post-Pandemic Transit Usage Frequency')
+# # Show the plot
+# plt.tight_layout()
+# plt.show()
 
 # # Mapping of numeric values to labels
 # freq_labels = ['Never', 'Once a month or less', 'A few times a month', '1-2 days a week', '3-4 days a week', 'Everyday']
@@ -412,6 +507,10 @@ plt.show()
 # # Use the reindex method to set the order
 # income_category_counts = income_category_counts.reindex(desired_order)
 # income_chart = income_category_counts.plot(kind='bar')
+# # set x label
+# plt.xlabel('Income Category')
+# # set y label
+# plt.ylabel('Count')
 # # Add data labels on each bar
 # for index, value in enumerate(income_category_counts):
 #     plt.text(index, value + 0.1, str(value), ha='center', va='bottom')
@@ -442,73 +541,3 @@ plt.show()
 # # rotate x-axis labels to be horizontal
 # plt.xticks(rotation=0)
 # plt.show()
-
-###################################################################################################################
-
-#       Create ordered logit model
-
-###################################################################################################################
-
-# create ordered logit model where dependent variable is 'wfh_future' and independent variables are
-# 'transit_usage_future', 'Middle_Income', 'High_Income'
-
-mod_log = OrderedModel(pooled_survey_data['wfh_future'],
-                       (pooled_survey_data[['transit_usage_future', 'Middle_Income', 'High_Income']]), distr='logit')
-res_log = mod_log.fit(method='bfgs', disp=False)
-print(res_log.summary())
-print("Log-likelihood of model: ", res_log.llf)
-print("loglikelihood of model without explanatory variables: ", res_log.llnull)
-print("Likelihood ratio chi-squared statistic: ", res_log.llr)
-print("chi-squared probability of getting a log-likelihood ratio statistic greater than llr: ", res_log.llr_pvalue)
-# compute the f-test for the model
-print("F-test for the model: ", res_log.f_test(np.eye(8)))
-
-params = res_log.params
-conf = res_log.conf_int()
-conf['Odds Ratio'] = params
-conf.columns = ['5%', '95%', 'Odds Ratio']
-print(np.exp(conf))
-print(np.exp(res_log.params))
-
-beginningtex = """\\documentclass{report}
-\\usepackage{booktabs}
-\\begin{document}"""
-endtex = "\end{document}"
-
-f = open('res_log_cross_sec.tex', 'w')
-f.write(beginningtex)
-f.write(res_log.summary().as_latex())
-f.write(endtex)
-f.close()
-
-# create ordered logit model where dependent variable is 'wfh_future' and independent variables are
-# 'transit_usage_future', 'Middle_Income', 'High_Income'
-
-mod_log = OrderedModel(pooled_survey_data['transit_usage_future'],
-                       (pooled_survey_data[['wfh_future', 'Middle_Income', 'High_Income']]), distr='logit')
-res_log = mod_log.fit(method='bfgs', disp=False)
-print(res_log.summary())
-print("Log-likelihood of model: ", res_log.llf)
-print("loglikelihood of model without explanatory variables: ", res_log.llnull)
-print("Likelihood ratio chi-squared statistic: ", res_log.llr)
-print("chi-squared probability of getting a log-likelihood ratio statistic greater than llr: ", res_log.llr_pvalue)
-# compute the f-test for the model
-print("F-test for the model: ", res_log.f_test(np.eye(8)))
-
-params = res_log.params
-conf = res_log.conf_int()
-conf['Odds Ratio'] = params
-conf.columns = ['5%', '95%', 'Odds Ratio']
-print(np.exp(conf))
-print(np.exp(res_log.params))
-
-beginningtex = """\\documentclass{report}
-\\usepackage{booktabs}
-\\begin{document}"""
-endtex = "\end{document}"
-
-f = open('res_log_transit_dependent_var.tex', 'w')
-f.write(beginningtex)
-f.write(res_log.summary().as_latex())
-f.write(endtex)
-f.close()
