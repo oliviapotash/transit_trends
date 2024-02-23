@@ -188,15 +188,23 @@ ordinal_mapping = {
     'Everyday': 5
 }
 
+# interval_mapping = {
+#     'Never': 0,  # days/week
+#     'Once a month or less': 0.25,
+#     'A few times a month': 1,
+#     '1-2 days a week': 1.5,
+#     '3-4 days a week': 3.5,
+#     'Everyday': 7
+# }
+
 interval_mapping = {
     'Never': 0,  # days/week
     'Once a month or less': 0.25,
     'A few times a month': 1,
     '1-2 days a week': 1.5,
     '3-4 days a week': 3.5,
-    'Everyday': 7
+    'Everyday': 5
 }
-
 
 # Recode parameters to numeric values
 pooled_survey_data['wfh_during_ord'] = pooled_survey_data['wfh_during'].map(ordinal_mapping)
@@ -316,8 +324,8 @@ f.close()
 # plt.xticks(rotation=0)
 # plt.show()
 
-# create bar chart of wfh_future_interval
-# ordered_num_days = [0, 0.25, 1, 1.5, 3.5, 7]
+# # create bar chart of wfh_future_interval
+# ordered_num_days = [0, 0.25, 1, 1.5, 3.5, 5]
 # wfh_chart_ordered_chart = pooled_survey_data['wfh_future_interval'].value_counts().reindex(ordered_num_days).plot(kind='bar')
 # # set x label
 # plt.xlabel('Post-Pandemic WFH Frequency Days/Week')
