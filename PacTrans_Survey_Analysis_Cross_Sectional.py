@@ -33,7 +33,11 @@ rename_list = [['In.a.typical.month.BEFORE.the.outbreak..e.g..in.January...how.o
                ['Sometime.in.the.future..when.COVID.19.will.no.longer.be.a.threat..how.often.do.you.think.you.will.use.the.following.modes.of.transportation...Public.Transit..Bus..Light.Rail..Streetcar..', 'transit_usage_future'],
                ['What.is.your.annual.household.income.level..', 'annual_hh_income'],
                ['What.is.your.annual.household.income.level.', 'annual_hh_income'],
-               ['Which.of.the.following.currently.live.with.you...Check.all.that.apply..', 'hh_size']]
+               ['Which.of.the.following.currently.live.with.you...Check.all.that.apply..', 'hh_size'],
+               ['Which.of.the.following.best.describes.your.current.job.situation.', 'job_status'],
+               ['What.is.your.gender.', 'gender'],
+               ['What.is.your.age.', 'age'],
+               ['What.is.the.highest.degree.or.level.of.school.you.have.completed.', 'education']]
 
 # iterate over list of dataframes
 for df in df_list:
@@ -42,6 +46,7 @@ for df in df_list:
         # rename columns
         df.rename(columns={old_col: new_col}, inplace=True)
 
+# TODO add joins for gender, age, education
 # join annual_hh_income column from Wave1_cleaned_noids to Wave2_prior_cleaned_noids and Wave3_prior_cleaned_noids based on user_id
 Wave2_prior_cleaned_noids = Wave2_prior_cleaned_noids.merge(Wave1_cleaned_noids[['user_id', 'annual_hh_income']], on='user_id', how='left')
 Wave3_prior_cleaned_noids = Wave3_prior_cleaned_noids.merge(Wave1_cleaned_noids[['user_id', 'annual_hh_income']], on='user_id', how='left')
@@ -49,6 +54,18 @@ Wave3_prior_cleaned_noids = Wave3_prior_cleaned_noids.merge(Wave1_cleaned_noids[
 # join hh_size column from Wave1_cleaned_noids to Wave2_prior_cleaned_noids and Wave3_prior_cleaned_noids based on user_id
 Wave2_prior_cleaned_noids = Wave2_prior_cleaned_noids.merge(Wave1_cleaned_noids[['user_id', 'hh_size']], on='user_id', how='left')
 Wave3_prior_cleaned_noids = Wave3_prior_cleaned_noids.merge(Wave1_cleaned_noids[['user_id', 'hh_size']], on='user_id', how='left')
+
+# join gender column from Wave1_cleaned_noids to Wave2_prior_cleaned_noids and Wave3_prior_cleaned_noids based on user_id
+Wave2_prior_cleaned_noids = Wave2_prior_cleaned_noids.merge(Wave1_cleaned_noids[['user_id', 'gender']], on='user_id', how='left')
+Wave3_prior_cleaned_noids = Wave3_prior_cleaned_noids.merge(Wave1_cleaned_noids[['user_id', 'gender']], on='user_id', how='left')
+
+# join age column from Wave1_cleaned_noids to Wave2_prior_cleaned_noids and Wave3_prior_cleaned_noids based on user_id
+Wave2_prior_cleaned_noids = Wave2_prior_cleaned_noids.merge(Wave1_cleaned_noids[['user_id', 'age']], on='user_id', how='left')
+Wave3_prior_cleaned_noids = Wave3_prior_cleaned_noids.merge(Wave1_cleaned_noids[['user_id', 'age']], on='user_id', how='left')
+
+# join education column from Wave1_cleaned_noids to Wave2_prior_cleaned_noids and Wave3_prior_cleaned_noids based on user_id
+Wave2_prior_cleaned_noids = Wave2_prior_cleaned_noids.merge(Wave1_cleaned_noids[['user_id', 'education']], on='user_id', how='left')
+Wave3_prior_cleaned_noids = Wave3_prior_cleaned_noids.merge(Wave1_cleaned_noids[['user_id', 'education']], on='user_id', how='left')
 
 # Identify common columns
 common_columns = list(set(Wave1_cleaned_noids.columns) & set(Wave2_fb_cleaned_noids.columns) & set(Wave2_prior_cleaned_noids.columns) & set(Wave3_fb_cleaned_noids.columns) & set(Wave3_prior_cleaned_noids.columns))
@@ -235,21 +252,6 @@ pooled_survey_data['transit_change_estimated'] = np.where(pooled_survey_data['tr
 
 # set transit_usage_future to ordered
 pooled_survey_data['transit_usage_future_ordered'] = pd.Categorical(pooled_survey_data['transit_usage_future'], categories=['Never', 'Once a month or less', 'A few times a month', '1-2 days a week', '3-4 days a week', 'Everyday'], ordered=True)
-
-# write pooled_survey_data to a new CSV file called 'pooled_survey_data_for_R.csv' with ONLY columns wf_future_interval, transit_usage_future_ordered, Middle_Income, High_Income
-
-pooled_survey_data.to_csv('pooled_survey_data_for_R.csv', index=False)
-
-# print first five rows of wfh_future_interval, transit_usage_future
-print(pooled_survey_data[['wfh_future_interval', 'transit_usage_future_ordered', 'Middle_Income', 'High_Income']].head())
-print(pooled_survey_data['wfh_future_interval'].value_counts())
-print(pooled_survey_data['transit_usage_future_ordered'].value_counts())
-print(pooled_survey_data['Middle_Income'].value_counts())
-print(pooled_survey_data['High_Income'].value_counts())
-
-# check that 'transit_usage_future_ordered' is ordered
-print("dtype of 'transit_usage_future_ordered': ", pooled_survey_data['transit_usage_future_ordered'].dtype)
-print("transit_usage_future_ordered is ordered?", pooled_survey_data['transit_usage_future_ordered'].dtype.ordered)
 
 mod_log = OrderedModel(pooled_survey_data['transit_usage_future_ordered'],
                        (pooled_survey_data[['wfh_future_interval', 'Middle_Income', 'High_Income']]), distr='logit')
@@ -549,3 +551,7 @@ f.close()
 # # rotate x-axis labels to be horizontal
 # plt.xticks(rotation=0)
 # plt.show()
+
+# print the counts of unique values in 'job_status'
+print(pooled_survey_data['job_status'].value_counts())
+
