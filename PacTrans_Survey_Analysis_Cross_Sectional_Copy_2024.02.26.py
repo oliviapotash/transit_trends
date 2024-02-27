@@ -88,9 +88,6 @@ pooled_survey_data = pd.read_csv('pooled_survey_data.csv')
 # Remove rows with NA values in specified columns
 pooled_survey_data = pooled_survey_data.dropna(subset=["wfh_during", "wfh_future", "transit_usage_during", "transit_usage_future", "annual_hh_income", "hh_size"])
 
-# filter out rows with 'Retired' in 'job_status' column
-pooled_survey_data = pooled_survey_data[pooled_survey_data['job_status'] != 'Retired']
-
 ###################################################################################################################
 
 #       Household Size Calculation and Income Categorization
@@ -206,6 +203,15 @@ ordinal_mapping = {
     '3-4 days a week': 4,
     'Everyday': 5
 }
+
+# interval_mapping = {
+#     'Never': 0,  # days/week
+#     'Once a month or less': 0.25,
+#     'A few times a month': 1,
+#     '1-2 days a week': 1.5,
+#     '3-4 days a week': 3.5,
+#     'Everyday': 7
+# }
 
 interval_mapping = {
     'Never': 0,  # days/week
