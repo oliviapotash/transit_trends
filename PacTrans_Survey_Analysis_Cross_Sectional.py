@@ -356,7 +356,7 @@ pooled_survey_data['transit_change_estimated'] = np.where(pooled_survey_data['tr
 # plt.savefig("income_category_counts.png")
 
 # Mapping of numeric values to labels
-freq_labels = ['Never', 'Once a month or less', 'A few times a month', '1-2 days a week', '3-4 days a week', 'Everyday']
+freq_labels = ['Never', '1/month or less', 'A few times a month', '1-2 days a week', '3-4 days a week', 'Everyday']
 
 # Create a figure and axis object for the subplots
 fig, axes = plt.subplots(3, 2, figsize=(12, 10), sharey=True)
@@ -375,11 +375,12 @@ for value, ax in zip(range(6), axes.flatten()):
     for index, val in enumerate(transit_usage_future_subset):
         ax.text(index, val + 0.01, f'{val:.2f}', ha='center', va='bottom', fontsize=14)
     # Set the x-axis tick locations and labels
-    ax.tick_params(axis='x', labelsize=9)
+    ax.tick_params(axis='x', labelsize=11)
+    ax.tick_params(axis='y', labelsize=11)
     ax.set_xticks(range(len(freq_labels)))
     ax.set_xticklabels(freq_labels, rotation=0, ha='center')
     # set y-axis label
-    ax.set_ylabel('Percentage of Responses', fontsize=12)
+    ax.set_ylabel('Percentage of Responses', fontsize=14)
     # set x-axis label
     ax.set_xlabel('Post-Pandemic Transit Usage Frequency', fontsize=12)
     # Set subplot title with corresponding label
